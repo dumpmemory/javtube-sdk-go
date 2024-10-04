@@ -1,12 +1,12 @@
 package engine
 
 import (
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
 
-	"go.uber.org/zap"
 	"gorm.io/gorm"
 
 	"github.com/metatube-community/metatube-sdk-go/common/fetch"
@@ -25,7 +25,7 @@ type Engine struct {
 	timeout time.Duration
 	fetcher *fetch.Fetcher
 	// Engine Logger
-	logger *zap.SugaredLogger
+	logger *log.Logger
 	// Name:Provider Map
 	actorProviders map[string]mt.ActorProvider
 	movieProviders map[string]mt.MovieProvider
@@ -145,6 +145,4 @@ func (e *Engine) Fetch(url string, provider mt.Provider) (*http.Response, error)
 }
 
 // String returns the name of the Engine instance.
-func (e *Engine) String() string {
-	return e.name
-}
+func (e *Engine) String() string { return e.name }

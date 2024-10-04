@@ -1,12 +1,10 @@
 package engine
 
 import (
+	"log"
 	"os"
 	"strconv"
 	"strings"
-	"time"
-
-	"go.uber.org/zap"
 
 	"github.com/metatube-community/metatube-sdk-go/common/fetch"
 	mt "github.com/metatube-community/metatube-sdk-go/provider"
@@ -19,19 +17,20 @@ const (
 )
 
 func (e *Engine) init() *Engine {
-	e.fetcher = fetch.Default(&fetch.Config{Timeout: e.timeout})
 	e.initLogger()
-	e.initActorProviders(e.timeout)
-	e.initMovieProviders(e.timeout)
+	e.initFetcher()
+	e.initActorProviders()
+	e.initMovieProviders()
 	e.initAllProviderPriorities()
 	return e
 }
 
 func (e *Engine) initLogger() {
-	logConf := zap.NewProductionConfig()
-	logConf.Encoding = "console"
-	logger, _ := logConf.Build()
-	e.logger = logger.Sugar()
+	e.logger = log.New(os.Stdout, "[ENGINE]\u0020", log.LstdFlags|log.Llongfile)
+}
+
+func (e *Engine) initFetcher() {
+	e.fetcher = fetch.Default(&fetch.Config{Timeout: e.timeout})
 }
 
 func (e *Engine) initAllProviderPriorities() {
@@ -40,7 +39,7 @@ func (e *Engine) initAllProviderPriorities() {
 		switch {
 		case strings.HasPrefix(key, ActorProviderPriorityEnvPrefix):
 			name := key[len(ActorProviderPriorityEnvPrefix):]
-			prio, _ := strconv.ParseInt(value, 0, 64)
+			prio, _ := strconv.ParseFloat(value, 64)
 			if prio == 0 {
 				delete(e.actorProviders, name)
 				continue
@@ -50,7 +49,7 @@ func (e *Engine) initAllProviderPriorities() {
 			}
 		case strings.HasPrefix(key, MovieProviderPriorityEnvPrefix):
 			name := key[len(MovieProviderPriorityEnvPrefix):]
-			prio, _ := strconv.ParseInt(value, 0, 64)
+			prio, _ := strconv.ParseFloat(value, 64)
 			if prio == 0 {
 				delete(e.movieProviders, name)
 				continue
@@ -63,39 +62,35 @@ func (e *Engine) initAllProviderPriorities() {
 }
 
 // initActorProviders initializes actor providers.
-func (e *Engine) initActorProviders(timeout time.Duration) {
-	{ // init
-		e.actorProviders = make(map[string]mt.ActorProvider)
-		e.actorHostProviders = make(map[string][]mt.ActorProvider)
-	}
-	mt.RangeActorFactory(func(name string, factory mt.ActorFactory) {
+func (e *Engine) initActorProviders() {
+	e.actorProviders = make(map[string]mt.ActorProvider)
+	e.actorHostProviders = make(map[string][]mt.ActorProvider)
+	for name, factory := range mt.RangeActorFactory {
 		provider := factory()
 		if s, ok := provider.(mt.RequestTimeoutSetter); ok {
-			s.SetRequestTimeout(timeout)
+			s.SetRequestTimeout(e.timeout)
 		}
 		// Add actor provider by name.
 		e.actorProviders[strings.ToUpper(name)] = provider
 		// Add actor provider by host.
 		host := provider.URL().Hostname()
 		e.actorHostProviders[host] = append(e.actorHostProviders[host], provider)
-	})
+	}
 }
 
 // initMovieProviders initializes movie providers.
-func (e *Engine) initMovieProviders(timeout time.Duration) {
-	{ // init
-		e.movieProviders = make(map[string]mt.MovieProvider)
-		e.movieHostProviders = make(map[string][]mt.MovieProvider)
-	}
-	mt.RangeMovieFactory(func(name string, factory mt.MovieFactory) {
+func (e *Engine) initMovieProviders() {
+	e.movieProviders = make(map[string]mt.MovieProvider)
+	e.movieHostProviders = make(map[string][]mt.MovieProvider)
+	for name, factory := range mt.RangeMovieFactory {
 		provider := factory()
 		if s, ok := provider.(mt.RequestTimeoutSetter); ok {
-			s.SetRequestTimeout(timeout)
+			s.SetRequestTimeout(e.timeout)
 		}
 		// Add movie provider by name.
 		e.movieProviders[strings.ToUpper(name)] = provider
 		// Add movie provider by host.
 		host := provider.URL().Hostname()
 		e.movieHostProviders[host] = append(e.movieHostProviders[host], provider)
-	})
+	}
 }
